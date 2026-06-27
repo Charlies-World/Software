@@ -1,0 +1,38 @@
+name: Process Images Manual
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: |
+          python -m pip install -r requirements.txt
+          mkdir -p image-pipeline/inbox/test-batch
+          python - <<'PY'
+          from PIL import Image, ImageDraw
+          from pathlib import Path
+          p=Path('image-pipeline/inbox/test-batch'); p.mkdir(parents=True, exist_ok=True)
+          for i,bg in enumerate([(255,255,255),(245,245,245),(235,235,235)],1):
+              im=Image.new('RGB',(512,512),bg)
+              d=ImageDraw.Draw(im)
+              d.ellipse((120,120,392,392),fill=(20,20,20))
+              d.rectangle((220,80,292,420),fill=(255,255,255))
+              d.text((170,450),f'Gizmo test {i}',fill=(0,0,0))
+              im.save(p/f'gizmo-test-{i}.jpg')
+          PY
+          python softstrange_image_editor.py repo-process --repo-root . --input-folder image-pipeline/inbox/test-batch --direction direction-white-clean.json --pipeline-root image-pipeline
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-pipeline-output
+          path: image-pipeline
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add image-pipeline
+          git diff --cached --quiet || (git commit -m "Run image pipeline [skip image-pipeline]" && git push)
